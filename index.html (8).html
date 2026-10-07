@@ -208,7 +208,7 @@ footer{text-align:center;padding:24px 16px;color:#8a7362;font-size:.72rem;border
     <button class="back-btn" id="backBtn">← Voltar ao lobby</button>
     <div class="table">
       <h2 class="font-display">🐉 Dragon</h2>
-      <div class="sub">Alinhe 3 dragões iguais na linha central e multiplique sua aposta!</div>
+      <div class="sub">Some os multiplicadores que caírem na linha central e multiplique sua aposta — mas se cair um "Nada", a rodada não paga nada!</div>
 
       <div class="reels" id="reels">
         <div class="reel"><div class="reel-strip" id="strip0"></div></div>
@@ -425,19 +425,22 @@ function evaluate(finalIdx){
   spinBtn.disabled = false;
   spinBtn.classList.remove('spinning');
 
-  const [a,b,c] = finalIdx;
+  const syms = finalIdx.map(i=>SYMBOLS[i]);
+  const hasNada = syms.some(s=>s.mult===0);
+  const totalMult = syms.reduce((sum,s)=>sum+s.mult,0);
   let win = 0;
-  if(a===b && b===c && SYMBOLS[a].mult>0){
-    win = bet * SYMBOLS[a].mult;
+
+  if(!hasNada && totalMult>0){
+    win = bet * totalMult;
     setBalance(balance + win);
     resultMsg.className='result-msg win';
-    resultMsg.textContent = `🐉 GANHOU ${SYMBOLS[a].label}! +${fmt(win)}`;
+    resultMsg.textContent = `🐉 ${syms.map(s=>s.label).join(' + ')} = ${totalMult}X! +${fmt(win)}`;
     reelEls.forEach(r=>r.classList.add('win-row-glow'));
-    playWin(SYMBOLS[a].mult >= 25);
+    playWin(totalMult >= 50);
     setTimeout(()=> reelEls.forEach(r=>r.classList.remove('win-row-glow')), 1600);
   } else {
     resultMsg.className='result-msg lose';
-    resultMsg.textContent = 'Não foi dessa vez. Tente novamente!';
+    resultMsg.textContent = hasNada ? 'Caiu um Nada — a rodada não paga nada!' : 'Não foi dessa vez. Tente novamente!';
     playLose();
   }
 }
