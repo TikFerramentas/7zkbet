@@ -473,21 +473,31 @@ function saveLastDeposit(ts){
 /* ----------------------------------------------------- */
 
 let balance = 1000;
+let displayBalance = 1000; // only used for the visual counting animation
+let balanceAnimFrame = null;
 let bet = 10;
 const fmt = v => 'R$ ' + v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 
 function setBalance(v, animate=true){
+  balance = v; // authoritative value updates immediately, never waits on animation
   saveBalance(v);
   const el = document.getElementById('balance');
-  if(!animate){ balance=v; el.textContent=fmt(v); return; }
-  const start = balance, diff = v - start, dur = 500, t0 = performance.now();
+  if(!animate){
+    displayBalance = v; el.textContent = fmt(v);
+    if(balanceAnimFrame){ cancelAnimationFrame(balanceAnimFrame); balanceAnimFrame=null; }
+    return;
+  }
+  if(balanceAnimFrame) cancelAnimationFrame(balanceAnimFrame);
+  const start = displayBalance, diff = v - start, dur = 500, t0 = performance.now();
   function step(t){
     const p = Math.min(1,(t-t0)/dur);
     const cur = start + diff*(1-Math.pow(1-p,3));
+    displayBalance = cur;
     el.textContent = fmt(cur);
-    if(p<1) requestAnimationFrame(step); else { balance=v; el.textContent=fmt(v); }
+    if(p<1){ balanceAnimFrame = requestAnimationFrame(step); }
+    else { displayBalance = v; el.textContent = fmt(v); balanceAnimFrame = null; }
   }
-  requestAnimationFrame(step);
+  balanceAnimFrame = requestAnimationFrame(step);
 }
 
 const depositBtn = document.getElementById('depositBtn');
