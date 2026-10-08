@@ -156,6 +156,18 @@ main{max-width:1100px;margin:0 auto;padding:22px 16px 60px;}
 .spin-btn.spinning{animation:pulse 1s infinite;}
 @keyframes pulse{0%,100%{box-shadow:0 6px 18px rgba(194,55,12,.5)}50%{box-shadow:0 6px 30px rgba(255,138,61,.9)}}
 
+.turbo-toggle{
+  background:var(--panel2); border:2px solid var(--gold); color:var(--gold2);
+  font-family:'Cinzel'; font-weight:700; font-size:.82rem; padding:11px 18px;
+  border-radius:999px; cursor:pointer; transition:.2s; white-space:nowrap;
+}
+.turbo-toggle:active{transform:scale(.94);}
+.turbo-toggle.on{
+  background:linear-gradient(180deg,#ffe9a8,#f3c75a); color:#2a1500;
+  box-shadow:0 0 16px rgba(243,199,90,.8); animation:turboGlow 1s infinite;
+}
+@keyframes turboGlow{0%,100%{box-shadow:0 0 10px rgba(243,199,90,.6)}50%{box-shadow:0 0 22px rgba(243,199,90,1)}}
+
 .paytable{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:20px;}
 .paytable div{background:var(--panel);border:1px solid rgba(243,199,90,.4);border-radius:10px;
   padding:8px;width:64px;text-align:center;}
@@ -315,6 +327,7 @@ footer{text-align:center;padding:24px 16px;color:#8a7362;font-size:.72rem;border
           <button id="betPlus">+</button>
         </div>
         <button class="spin-btn font-display" id="spinBtn">GIRAR</button>
+        <button class="turbo-toggle" id="turboToggle" aria-pressed="false">⚡ Turbo</button>
       </div>
 
       <div class="paytable" id="paytable"></div>
@@ -322,7 +335,7 @@ footer{text-align:center;padding:24px 16px;color:#8a7362;font-size:.72rem;border
   </div>
 </main>
 
-<footer>© 2026 7ZK Bet — Todos os direitos reservados. +18 | Este site é ficticio, não incentivamos a aposta real.</footer>
+<footer>© 2026 7ZK Bet — Todos os direitos reservados. +18 | Jogue com responsabilidade.</footer>
 
 <script>
 const SYMBOLS = [
@@ -539,7 +552,7 @@ document.getElementById('navJogos').onclick = ()=>{
 };
 document.getElementById('openDragon').onclick = ()=>{ playClick(); hideAllGames(); showDragon(); };
 document.getElementById('openAviator').onclick = ()=>{ playClick(); hideAllGames(); showAviator(); avResetVisual(); };
-document.getElementById('backBtn').onclick = ()=>{ playClick(); hideAllGames(); showLobby(); };
+document.getElementById('backBtn').onclick = ()=>{ playClick(); if(turboMode) stopTurbo(); hideAllGames(); showLobby(); };
 document.getElementById('backBtnAviator').onclick = ()=>{ playClick(); avForceStop(); hideAllGames(); showLobby(); };
 
 // bet controls
@@ -576,16 +589,40 @@ function buildStrip(stripEl, finalIdx){
 }
 
 let spinning = false;
+let turboMode = false;
 const resultMsg = document.getElementById('resultMsg');
 const spinBtn = document.getElementById('spinBtn');
+const turboToggle = document.getElementById('turboToggle');
 const strips = [document.getElementById('strip0'),document.getElementById('strip1'),document.getElementById('strip2')];
 const reelEls = document.querySelectorAll('.reel');
+
+function stopTurbo(){
+  turboMode = false;
+  turboToggle.classList.remove('on');
+  turboToggle.setAttribute('aria-pressed','false');
+  turboToggle.textContent = '⚡ Turbo';
+  if(!spinning) spinBtn.disabled = false;
+}
+turboToggle.onclick = ()=>{
+  playClick();
+  turboMode = !turboMode;
+  turboToggle.classList.toggle('on', turboMode);
+  turboToggle.setAttribute('aria-pressed', String(turboMode));
+  turboToggle.textContent = turboMode ? '⚡ Turbo ON' : '⚡ Turbo';
+  if(turboMode){
+    spinBtn.disabled = true;
+    if(!spinning) spin();
+  } else if(!spinning){
+    spinBtn.disabled = false;
+  }
+};
 
 function spin(){
   if(spinning) return;
   if(balance < bet){
     resultMsg.className='result-msg lose';
     resultMsg.textContent = 'Saldo insuficiente — deposite mais fichas!';
+    if(turboMode) stopTurbo();
     return;
   }
   spinning = true;
@@ -600,13 +637,18 @@ function spin(){
   const finalIdx = [weightedRandom(), weightedRandom(), weightedRandom()];
   const ROW_H = 90;
 
+  const delays = turboMode ? [0,60,120]    : [300,650,1000];
+  const durs   = turboMode ? [220,220,220] : [1100,1450,1800];
+  let maxFinish = 0;
+
   strips.forEach((stripEl, i)=>{
     const len = buildStrip(stripEl, finalIdx[i]);
     void stripEl.offsetHeight; // reflow
     const targetIndex = len - 2; // index of the forced final symbol
     const targetY = -(targetIndex - 1) * ROW_H; // -1 so it lands in middle visible row
-    const delay = 300 + i*350;
-    const dur = 1100 + i*350;
+    const delay = delays[i];
+    const dur = durs[i];
+    maxFinish = Math.max(maxFinish, delay+dur);
     setTimeout(()=>{
       stripEl.style.transition = `transform ${dur}ms cubic-bezier(.15,.8,.25,1)`;
       stripEl.style.transform = `translateY(${targetY}px)`;
@@ -614,13 +656,13 @@ function spin(){
     setTimeout(()=> playReelStop(), delay + dur);
   });
 
-  const totalTime = 300 + 2*350 + 1100 + 2*350 + 150;
+  const totalTime = maxFinish + (turboMode ? 90 : 150);
   setTimeout(()=> evaluate(finalIdx), totalTime);
 }
 
 function evaluate(finalIdx){
   spinning = false;
-  spinBtn.disabled = false;
+  spinBtn.disabled = turboMode;
   spinBtn.classList.remove('spinning');
 
   const syms = finalIdx.map(i=>SYMBOLS[i]);
@@ -640,6 +682,15 @@ function evaluate(finalIdx){
     resultMsg.className='result-msg lose';
     resultMsg.textContent = hasNada ? 'Caiu um Nada — a rodada não paga nada!' : 'Não foi dessa vez. Tente novamente!';
     playLose();
+  }
+
+  if(turboMode){
+    if(balance >= bet){
+      setTimeout(()=>{ if(turboMode && !spinning) spin(); }, 380);
+    } else {
+      stopTurbo();
+      resultMsg.textContent += ' Turbo desativado: saldo insuficiente.';
+    }
   }
 }
 
